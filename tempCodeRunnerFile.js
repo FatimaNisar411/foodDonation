@@ -1,0 +1,1 @@
+const connectToMongoDB = require('./config/db');
