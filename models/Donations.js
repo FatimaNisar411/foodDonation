@@ -17,21 +17,19 @@ const DonationsSchema = new mongoose.Schema({
 
 const Donations = mongoose.model('Donations',DonationsSchema);
 
-const createDonationCollection = async () => {
-  try {
-    await connectToMongoDB(); // Establish a connection to the MongoDB database
-    const connection = mongoose.connection;
-    const collectionExists = await connection.db.listCollections({ name: 'donations' }).hasNext();
+// const createDonationCollection = async () => {
+//   try {
+//     const collectionExists = await connectToMongoDB.db.listCollections({ name: 'donations' }).hasNext();
 
-    if (!collectionExists) {
-      await connection.db.createCollection('donations');
-      console.log('Donations collection created.');
-    } else {
-      console.log('Donations collection already exists.');
-    }
-  } catch (error) {
-    console.error('Error creating donations collection:', error);
-  }
-};
-createDonationCollection();
+//     if (!collectionExists) {
+//       await connection.db.createCollection('donations');
+//       console.log('Donations collection created.');
+//     } else {
+//       console.log('Donations collection already exists.');
+//     }
+//   } catch (error) {
+//     console.error('Error creating donations collection:', error);
+//   }
+// };
+// createDonationCollection();
 module.exports = Donations;

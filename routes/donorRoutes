@@ -1,0 +1,194 @@
+const bcrypt = require('bcrypt');
+const express = require("express");
+const bodyParser = require('body-parser');
+const jwt = require('jsonwebtoken');
+const Donor = require("../models/donor");
+const cors = require('cors');
+
+const app = express();
+
+app.use(express.json());
+app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+console.log('Donor routes working');
+
+// Secret key for JWT
+const secretKey = 'your-secret-key';
+const blacklistedTokens = new Set();
+
+// ======================= MIDDLEWARES ===============================
+const validateTokenMiddleware = (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).json({ message: "Authorization header is missing" });
+  }
+
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.json({ message: "Invalid token" });
+    }
+
+    req.userId = decoded.userId;
+    next();
+  });
+};
+
+// Middleware to check if the token is blacklisted
+const isTokenBlacklisted = (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if (blacklistedTokens.has(token)) {
+    return res.status(401).json({ message: 'Token has been blacklisted' });
+  }
+
+  next();
+};
+
+// ============= AUTH ROUTES START ==========/
+
+app.post('/signup-donor', async (req, res) => {
+  const { name,username, type, contact, address, city, email, password, location } = req.body;
+   console.log("REQ BODY", req.body);
+  try {
+    // Check if the email is already registered
+    const existingDonor = await Donor.findOne({ email });
+    if (existingDonor) {
+      return res.status(400).json({ message: 'Email is already registered' });
+    }
+
+    // Hash the password using bcrypt
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create a new Donor with the provided data
+    const newDonor = new Donor({
+      name,
+      username,
+      type,
+      contact,
+      address,
+      city,
+      email,
+      password: hashedPassword,
+      location,
+      donations: []
+    });
+
+    await newDonor.save();
+
+    const token = jwt.sign({ userId: newDonor._id }, secretKey, { expiresIn: '1h' });
+    res.json({ token });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ============= AUTH ROUTES - END ==========/
+
+app.post('/login-donor', async (req, res) => {
+    const {username, password } = req.body;
+  
+    try {
+      // Check if the donor exists in MongoDB
+      const donor = await Donor.findOne({ username });
+  
+      if (donor && (await bcrypt.compare(password, donor.password))) {
+        // Password is correct, generate a JWT token
+        const token = jwt.sign({ userId: donor._id }, secretKey, { expiresIn: '1h' });
+        res.json({ token });
+      } else {
+        res.status(401).json({ message: 'Invalid credentials' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  app.post('/logout-donor', validateTokenMiddleware, (req, res) => {
+    const token = req.headers.authorization;
+  
+    // Add the token to the blacklist
+    blacklistedTokens.add(token);
+  
+    res.json({ message: 'Logout successful' });
+  });
+  
+  app.get(
+    "/validate_token_donor",
+    validateTokenMiddleware,
+    isTokenBlacklisted,
+    (req, res) => {
+      // If the middleware succeeds, the token is valid & IS NOT BLACKLISTED, and req.userId is available
+      res.json({ message: "Token is valid", userId: req.userId });
+    }
+  );
+  
+  // CRUD Routes for Donors
+  app.post("/donors", async (req, res) => {
+    try {
+      const donorData = req.body;
+      console.log(donorData);
+      // Validate donorData
+      // const validatedData = validateAndStructureDonorData(donorData);
+  
+      const newDonor = await Donor.create(donorData);
+      res.status(201).json(newDonor);
+    } catch (error) {
+      console.error("Error creating donor:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+  app.get("/donors/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const donor = await Donor.findById(id);
+      res.status(200).json(donor);
+    } catch (error) {
+      console.error("Error fetching donors:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+  app.get("/donors", async (req, res) => {
+    try {
+      const donors = await Donor.find();
+      res.status(200).json(donors);
+    } catch (error) {
+      console.error("Error fetching donors:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+  app.put("/donors/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const donorData = req.body;
+      console.log(donorData);
+      // Validate donorData
+      // const validatedData = validateAndStructureDonorData(donorData);
+  
+      const updatedDonor = await Donor.findByIdAndUpdate(id, donorData, { new: true });
+      res.status(200).json(updatedDonor);
+    } catch (error) {
+      console.error("Error updating donor:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+  app.delete("/donors/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+  
+      await Donor.findByIdAndDelete(id);
+      res.status(200).json({ message: "Donor deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting donor:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+module.exports = app;
