@@ -4,6 +4,8 @@ const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const Donor = require("../models/donor");
 const cors = require('cors');
+const Donation= require('../models/Donations');
+
 
 const app = express();
 
@@ -19,11 +21,13 @@ const blacklistedTokens = new Set();
 
 // ======================= MIDDLEWARES ===============================
 const validateTokenMiddleware = (req, res, next) => {
-  const token = req.headers.authorization;
+  const token = req.headers.authorization.split(' ')[1]; // Extract token from 'Bearer <token>'
 
   if (!token) {
     return res.status(401).json({ message: "Authorization header is missing" });
   }
+
+  console.log('Token:', token); // Debug line
 
   jwt.verify(token, secretKey, (err, decoded) => {
     if (err) {
@@ -48,9 +52,46 @@ const isTokenBlacklisted = (req, res, next) => {
 
 // ============= AUTH ROUTES START ==========/
 
+// app.post('/signup-donor', async (req, res) => {
+//   const { username, type,restaurant_name, contact, address, email, password, location } = req.body;
+//    console.log("REQ BODY", req.body);
+//   try {
+//     // Check if the email is already registered
+//     const existingDonor = await Donor.findOne({ email });
+//     if (existingDonor) {
+//       return res.status(400).json({ message: 'Email is already registered' });
+//     }
+
+//     // Hash the password using bcrypt
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Create a new Donor with the provided data
+//     const newDonor = new Donor({
+//       // name,
+//       username,
+//       type,
+//       restaurant_name: restaurant_name || '',
+//       contact,
+//       address,
+//       // city,
+//       email,
+//       password: hashedPassword,
+//       location,
+//       donations: []
+//     });
+
+//     await newDonor.save();
+
+//     const token = jwt.sign({ userId: newDonor._id }, secretKey, { expiresIn: '1h' });
+//     res.json({ token });
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
 app.post('/signup-donor', async (req, res) => {
-  const { name,username, type, contact, address, city, email, password, location } = req.body;
-   console.log("REQ BODY", req.body);
+  const { username, type, restaurant_name, contact, address, email, password, location } = req.body;
+  console.log("REQ BODY", req.body);
   try {
     // Check if the email is already registered
     const existingDonor = await Donor.findOne({ email });
@@ -63,15 +104,17 @@ app.post('/signup-donor', async (req, res) => {
 
     // Create a new Donor with the provided data
     const newDonor = new Donor({
-      name,
       username,
       type,
+      restaurant_name: restaurant_name || '',
       contact,
       address,
-      city,
       email,
       password: hashedPassword,
-      location,
+      location: {
+        // type: 'Point',
+        coordinates: location
+      },
       donations: []
     });
 
@@ -84,6 +127,7 @@ app.post('/signup-donor', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // ============= AUTH ROUTES - END ==========/
 
@@ -125,7 +169,255 @@ app.post('/login-donor', async (req, res) => {
       res.json({ message: "Token is valid", userId: req.userId });
     }
   );
+  app.post('/add-donation-to-donor/:donorId', async (req, res) => {
+    try {
+      const { donorId } = req.params; // Extract donorId from the request parameters
+      const donor = await Donor.findById(donorId);
   
+      if (!donor) {
+        return res.status(404).json({ message: 'Donor not found' });
+      }
+  
+      console.log('Donor found:', donor);
+  
+      const { food_type, quantity, expiry_date, pickup_time } = req.body;
+  
+      // Generate a unique donation ID
+      const donationId = '000000000000111111112222';
+  
+      // Create a new donation object with the required fields
+      const newDonation = {
+        food_type,
+        quantity,
+        expiry_date,
+        pickup_time,
+        donation_id: donationId
+      };
+  
+      console.log('New donation object:', newDonation);
+  
+      // Push the new donation object to the donor's donations array
+      donor.donations.push(newDonation);
+  
+      // Save the updated donor object
+      await donor.save();
+  
+      const updatedDonor = await Donor.findById(donorId);
+  
+      console.log('Updated Donor:', updatedDonor);
+      console.log('Donations:', updatedDonor.donations);
+  
+      res.json({ message: 'Donation added successfully' });
+    } catch (error) {
+      console.error('Error adding donation:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+
+  app.get("/donors", async (req, res) => {
+    try {
+      const allStudents = await Donor.find().populate('donations');
+      res.json(allStudents);
+    } catch (error) {
+      console.error("Error fetching all students:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+  
+  // app.post('/add-donation-to-donor', async (req, res) => {
+  //   try {
+  //     const userId = '6648553d17337efdebf72d96'; // Replace with a valid user ID
+  //     const donor = await Donor.findById(userId);
+  
+  //     if (!donor) {
+  //       return res.status(404).json({ message: 'Donor not found' });
+  //     }
+  
+  //     console.log('Donor found:', donor);
+  
+  //     const { food_type, quantity, expiry_date, pickup_time } = req.body;
+  
+  //     // Generate a unique donation ID
+  //     const donationId = '000000000000111111112222';
+  
+  //     // Create a new donation object with the required fields
+  //     const newDonation = {
+  //       food_type,
+  //       quantity,
+  //       expiry_date,
+  //       pickup_time,
+  //       donation_id: donationId
+  //     };
+  
+  //     console.log('New donation object:', newDonation);
+  
+  //     // Push the new donation object to the donor's donations array
+  //     donor.donations.push(newDonation);
+  
+  //     // Save the updated donor object
+  //     await donor.save();
+  
+  //     const updatedDonor = await Donor.findById(userId);
+  
+  //     console.log('Updated Donor:', updatedDonor);
+  //     console.log('Donations:', updatedDonor.donations);
+  
+  //     res.json({ message: 'Donation added successfully' });
+  //   } catch (error) {
+  //     console.error('Error adding donation:', error);
+  //     res.status(500).json({ message: 'Internal server error' });
+  //   }
+  // });
+
+
+// app.post('/add-donation', async (req, res) => {
+//   try {
+//     const userId = '66464769f8e9bc05709878f7'; // Replace with a valid user ID
+//     const donor = await Donor.findById(userId);
+
+//     if (!donor) {
+//       return res.status(404).json({ message: 'Donor not found' });
+//     }
+
+//     console.log('Donor found:', donor);
+
+//     const { food_type, quantity, expiry_date, pickup_time } = req.body;
+
+//     // Generate a unique donation ID
+//     const donationId = '000000000000111111112222';
+
+//     // Create a new donation object
+//     const newDonation = {
+//       donor: userId, // Set the donor field to the user ID
+//       food_type,
+//       quantity,
+//       expiry_date,
+//       pickup_time,
+//       donation_id: donationId
+//     };
+
+//     console.log('New donation object:', newDonation);
+
+//     // Save the new donation to the donations collection
+//     const donation = new Donation(newDonation);
+//     console.log('Saving donation:', donation);
+
+//     await donation.save();
+//     console.log('Donation saved successfully:', donation);
+
+//     // Update the donor's donations array with the new donation object
+//     donor.donations.push(donation);
+
+//     // Save the updated donor object
+//     await donor.save();
+
+//     const updatedDonor = await Donor.findById(userId);
+
+//     console.log('Updated Donor:', updatedDonor);
+//     console.log('Donations:', updatedDonor.donations);
+
+//     res.json({ message: 'Donation added successfully' });
+//   } catch (error) {
+//     console.error('Error adding donation:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
+app.post('/add-donation-to-Donations', async (req, res) => {
+  try {
+    const userId = '6648553d17337efdebf72d96'; // Replace with a valid user ID
+    const donor = await Donor.findById(userId);
+
+    if (!donor) {
+      return res.status(404).json({ message: 'Donor not found' });
+    }
+
+    console.log('Donor found:', donor);
+
+    const { food_type, quantity, expiry_date, pickup_time } = req.body;
+
+    // Generate a unique donation ID
+    const donationId = '000000000000111111112222';
+
+    // Create a new donation object
+    const newDonation = new Donation({
+      donor: userId, // Set the donor field to the user ID
+      food_type,
+      quantity,
+      expiry_date,
+      pickup_time,
+      
+    });
+
+    console.log('New donation object:', newDonation);
+
+    // Save the new donation to the donations collection
+    await newDonation.save();
+    console.log('Donation saved successfully:', newDonation);
+
+    res.json({ message: 'Donation added successfully' });
+  } catch (error) {
+    console.error('Error adding donation:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+// ----------------------Combined Functionality---------------------
+app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) => {
+  try {
+    const { donorId } = req.params; // Extract donorId from the request parameters
+    const donor = await Donor.findById(donorId);
+
+    if (!donor) {
+      return res.status(404).json({ message: 'Donor not found' });
+    }
+
+    console.log('Donor found:', donor);
+
+    const { food_type, quantity, expiry_date, pickup_time } = req.body;
+
+    // Create a new donation object
+    const newDonation = new Donation({
+      donor: donorId, // Set the donor field to the donor ID
+      food_type,
+      quantity,
+      expiry_date,
+      pickup_time,
+    });
+
+    console.log('New donation object:', newDonation);
+
+    // Save the new donation to the donations collection
+    await newDonation.save();
+    console.log('Donation saved successfully:', newDonation);
+
+    // Push the new donation object to the donor's donations array
+    const newDonationWithId = {
+      food_type,
+      quantity,
+      expiry_date,
+      pickup_time,
+      donation_id: newDonation._id // Add the donation ID from the newly created donation
+    };
+
+    donor.donations.push(newDonationWithId);
+
+    // Save the updated donor object
+    await donor.save();
+
+    const updatedDonor = await Donor.findById(donorId);
+
+    console.log('Updated Donor:', updatedDonor);
+    console.log('Donations:', updatedDonor.donations);
+
+    res.json({ message: 'Donation added successfully', newDonation });
+  } catch (error) {
+    console.error('Error adding donation:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+
   // CRUD Routes for Donors
   app.post("/donors", async (req, res) => {
     try {
@@ -153,15 +445,15 @@ app.post('/login-donor', async (req, res) => {
     }
   });
   
-  app.get("/donors", async (req, res) => {
-    try {
-      const donors = await Donor.find();
-      res.status(200).json(donors);
-    } catch (error) {
-      console.error("Error fetching donors:", error);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
+  // app.get("/donors", async (req, res) => {
+  //   try {
+  //     const donors = await Donor.find();
+  //     res.status(200).json(donors);
+  //   } catch (error) {
+  //     console.error("Error fetching donors:", error);
+  //     res.status(500).json({ error: "Internal Server Error" });
+  //   }
+  // });
   
   app.put("/donors/:id", async (req, res) => {
     try {

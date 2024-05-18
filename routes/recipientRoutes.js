@@ -1,4 +1,4 @@
-
+const { ObjectId } = require('mongodb'); // Import ObjectId from mongodb
 const bcrypt = require('bcrypt');
 const express = require("express");
 const bodyParser = require('body-parser');
@@ -6,6 +6,9 @@ const jwt = require('jsonwebtoken');
 // const recipientService = require("../service/RecipientService");
 const { validateAndStructureRecipientData } = require("../validators/validators");
 const Recipient = require("../models/Recipient");
+const Donation= require('../models/Donations');
+const Rider= require('../models/Rider');
+
 const cors = require('cors');
 
 const app = express();
@@ -22,7 +25,7 @@ const blacklistedTokens = new Set();
 
 // ======================= MIDDLEWARES ===============================
 const validateTokenMiddleware = (req, res, next) => {
-  const token = req.headers.authorization;
+  const token = req.headers.authorization.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: "Authorization header is missing" });
@@ -30,6 +33,7 @@ const validateTokenMiddleware = (req, res, next) => {
 
   jwt.verify(token, secretKey, (err, decoded) => {
     if (err) {
+      console.log(err);
       return res.json({ message: "Invalid token" });
     }
 
@@ -52,7 +56,7 @@ const isTokenBlacklisted = (req, res, next) => {
 // ============= AUTH ROUTES START ==========/
 
 app.post('/signup-recipient', async (req, res) => {
-    const { name, username ,type, contact, address, email, password, location } = req.body;
+    const { username , contact, address, email, password, location } = req.body;
      console.log("REW BODY", req.body);
     try {
       // Check if the email is already registered
@@ -66,14 +70,17 @@ app.post('/signup-recipient', async (req, res) => {
   
       // Create a new Recipient with the provided data
       const newRecipient = new Recipient({
-        name,
+        // name,
         username,
-        type,
+        // type,
         contact,
         address,
         email,
         password: hashedPassword,
-        location,
+        location: {
+          // type: 'Point',
+          coordinates: location
+        },
         received_donations: []
       });
   
@@ -128,7 +135,105 @@ app.get(
 
 // ============= AUTH ROUTES - END ==========/
 
+app.post('/assign-rider/:recipientId/:donationId', async (req, res) => {
+  try {
+    const { recipientId, donationId } = req.params;
+    const { riderId } = req.body;
+
+    // Find the recipient
+    const recipient = await Recipient.findById(recipientId);
+    if (!recipient) {
+      return res.status(404).json({ message: 'Recipient not found' });
+    }
+
+    // Find the donation
+    const donation = await Donation.findById(donationId);
+    if (!donation) {
+      return res.status(404).json({ message: 'Donation not found' });
+    }
+
+    // Find the rider
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      return res.status(404).json({ message: 'Rider not found' });
+    }
+
+    // Update the donation's assigned_rider field
+    donation.assigned_rider = riderId;
+    await donation.save();
+
+    // Add the donation to the recipient's received_donations array
+    recipient.received_donations.push({
+      donation_id: donation._id,
+      donor_id: donation.donor,
+      food_type: donation.food_type,
+      quantity: donation.quantity,
+      expiry_date: donation.expiry_date,
+      // pickup_time: donation.pickup_time,
+      // delivery_time: donation.delivery_time,
+      // delivery_status: donation.delivery_status,
+    });
+    await recipient.save();
+
+    // Add the donation to the rider's delivered_donations array
+    rider.delivered_donations.push({
+      donation_id: donation._id,
+      delivery_status: 'pending', // initial status
+      pickup_time: null,          // set to null initially
+      delivery_time: null,        // set to null initially
+    });
+    await rider.save();
+
+    res.json({ message: 'Rider assigned successfully', donation });
+  } catch (error) {
+    console.error('Error assigning rider:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// app.post('/assign-rider/:recipientId/:donationId', async (req, res) => {
+//   try {
+//     const { recipientId, donationId } = req.params;
+//     const { riderId } = req.body;
+
+//     // Find the recipient and donation
+//     const recipient = await Recipient.findById(recipientId);
+//     if (!recipient) {
+//       return res.status(404).json({ message: 'Recipient not found' });
+//     }
+
+//     const donation = await Donation.findById(donationId);
+//     if (!donation) {
+//       return res.status(404).json({ message: 'Donation not found' });
+//     }
+
+//     // Update the donation's assigned_rider field
+//     donation.assigned_rider = riderId;
+//     await donation.save();
+
+//     // Add the donation to the recipient's received_donations array
+//     recipient.received_donations.push({
+//       donation_id: donation._id,
+//       donor_id: donation.donor,
+//       food_type: donation.food_type,
+//       quantity: donation.quantity,
+//       expiry_date: donation.expiry_date,
+//       // pickup_time: donation.pickup_time,
+//       // delivery_time: donation.delivery_time,
+//       // delivery_status: donation.delivery_status,
+//     });
+
+//     await recipient.save();
+
+//     res.json({ message: 'Rider assigned successfully', donation });
+//   } catch (error) {
+//     console.error('Error assigning rider:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
+
 app.get("/", (req, res) => {
+  // console.log("Recipient routes Working");
   res.send("Recipient routes Working");
 });
 
@@ -158,9 +263,10 @@ app.get("/recipients/:id", async (req, res) => {
   }
 });
 
-app.get("/recipients", async (req, res) => {
+app.get("/recipients", validateTokenMiddleware ,async (req, res) => {
   try {
-    const recipients = await recipientService.getAllRecipients();
+    // const recipients = await recipientService.getAllRecipients();
+    const recipients = await Recipient.find();
     res.status(200).json(recipients);
   } catch (error) {
     console.error("Error fetching recipients:", error);

@@ -1,1 +1,2 @@
-const connectToMongoDB = require('./config/db');
+
+const express = require('express');
