@@ -36,7 +36,8 @@ location: {
         quantity: { type: Number, required: true },
         expiry_date: { type: String, required: true }, // Changed to String
         status: { type: String, enum: ['pending', 'picked_up', 'delivered'], default: 'pending' }, // Default set to 'pending'
-        pickup_time: { type: String }, // Not required at creation time
+        pickup_time: { type: String },
+        recipient:{type:String, required:false} // Not required at creation time
       },
     ],
     default: [],

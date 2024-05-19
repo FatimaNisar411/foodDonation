@@ -33,7 +33,8 @@ const DonationsSchema = new mongoose.Schema({
   expiry_date: { type: Date, required: true },
   status: { type: String, enum: ['pending', 'picked_up', 'delivered'], required: true, default: 'pending' },
   pickup_time: { type: String },  // Changed to String
-  delivery_time: { type: String }  // Changed to String
+  delivery_time: { type: String },
+  recipient:{type:String, required:false} // Changed to String
 });
 
 const Donations = mongoose.model('Donations', DonationsSchema);

@@ -92,6 +92,7 @@ app.post('/signup-rider/:recipientId', async (req, res) => {
   const { username, contact, email, number_plate, starting_time, ending_time } = req.body;
   try {
     // Check if the email is already registered
+    Rider.findByIdAndUpdate
     const existingRider = await Rider.findOne({ email });
     if (existingRider) {
       return res.status(400).json({ message: 'Email is already registered' });

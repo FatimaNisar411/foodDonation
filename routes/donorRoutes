@@ -362,6 +362,7 @@ app.post('/add-donation-to-Donations', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 // ----------------------Combined Functionality---------------------
 app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) => {
   try {
@@ -374,7 +375,7 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
 
     console.log('Donor found:', donor);
 
-    const { food_type, quantity, expiry_date, pickup_time } = req.body;
+    const { food_type, quantity, expiry_date, status ,pickup_time } = req.body;
 
     // Create a new donation object
     const newDonation = new Donation({
@@ -382,6 +383,7 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
       food_type,
       quantity,
       expiry_date,
+      status,
       pickup_time,
     });
 
@@ -396,6 +398,7 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
       food_type,
       quantity,
       expiry_date,
+      status,
       pickup_time,
       donation_id: newDonation._id // Add the donation ID from the newly created donation
     };
@@ -415,6 +418,47 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
     console.error('Error adding donation:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+});
+// Route to get donations of a donor with status pending or pickup
+app.get('/donor/:donorId/donations', async (req, res) => {
+  try {
+    const { donorId } = req.params;
+
+    const donations = await Donation.find({ donor: donorId, status: { $in: ['pending', 'picked up'] } });
+
+    if (!donations.length) {
+      return res.status(404).json({ message: 'No donations found with the specified status' });
+    }
+
+    res.json(donations);
+  } catch (error) {
+    console.error('Error fetching donations:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Route to get donations of a donor with status completed (history)
+app.get('/donor/:donorId/donations/delivered', async (req, res) => {
+  try {
+    const { donorId } = req.params;
+
+    const donations = await Donation.find({ donor: donorId, status: 'delivered' });
+
+    if (!donations.length) {
+      return res.status(404).json({ message: 'No completed donations found' });
+    }
+
+    res.json(donations);
+  } catch (error) {
+    console.error('Error fetching completed donations:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
 
 

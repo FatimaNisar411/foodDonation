@@ -11,7 +11,7 @@ const riderRoutes = require('./routes/riderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3002;
 
 // Connect to MongoDB Atlas
 connectToMongoDB();
