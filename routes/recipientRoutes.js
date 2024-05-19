@@ -8,8 +8,11 @@ const { validateAndStructureRecipientData } = require("../validators/validators"
 const Recipient = require("../models/Recipient");
 const Donation= require('../models/Donations');
 const Rider= require('../models/Rider');
-
+const Donor= require('../models/donor');
 const cors = require('cors');
+const mongoose = require('mongoose');
+const geolib = require('geolib');
+
 
 const app = express();
 
@@ -135,7 +138,7 @@ app.get(
 
 // ============= AUTH ROUTES - END ==========/
 
-app.post('/assign-rider/:recipientId/:donationId', async (req, res) => {
+app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , async (req, res) => {
   try {
     const { recipientId, donationId } = req.params;
     const { riderId } = req.body;
@@ -184,59 +187,105 @@ app.post('/assign-rider/:recipientId/:donationId', async (req, res) => {
     });
     await rider.save();
 
+    // const donorDonationIndex = donor.donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+    // if (donorDonationIndex !== -1) {
+    //   donor.donations[donorDonationIndex].recipient = recipientId; // Update the recipient ID in the donor's donation
+    // } else {
+    //   console.log(`Donation with ID ${donation._id} not found in donor's donations array`);
+    //   return res.status(404).json({ message: 'Donation not found in donor\'s donations array' });
+    // }
+    // await donor.save();
+
     res.json({ message: 'Rider assigned successfully', donation });
   } catch (error) {
     console.error('Error assigning rider:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+app.get('/riders/:recipientId', validateTokenMiddleware, async (req, res) => {
+  try {
+    const { recipientId } = req.params;
 
-// app.post('/assign-rider/:recipientId/:donationId', async (req, res) => {
-//   try {
-//     const { recipientId, donationId } = req.params;
-//     const { riderId } = req.body;
+    // Validate recipientId
+    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+      return res.status(400).json({ message: 'Invalid recipient ID' });
+    }
 
-//     // Find the recipient and donation
-//     const recipient = await Recipient.findById(recipientId);
-//     if (!recipient) {
-//       return res.status(404).json({ message: 'Recipient not found' });
-//     }
+    // Find riders with the specified recipient ID
+    const riders = await Rider.find({ recipient: recipientId });
 
-//     const donation = await Donation.findById(donationId);
-//     if (!donation) {
-//       return res.status(404).json({ message: 'Donation not found' });
-//     }
+    if (riders.length === 0) {
+      return res.status(404).json({ message: 'No riders found for the specified recipient ID' });
+    }
 
-//     // Update the donation's assigned_rider field
-//     donation.assigned_rider = riderId;
-//     await donation.save();
+    res.json({ riders });
+  } catch (error) {
+    console.error('Error fetching riders:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
-//     // Add the donation to the recipient's received_donations array
-//     recipient.received_donations.push({
-//       donation_id: donation._id,
-//       donor_id: donation.donor,
-//       food_type: donation.food_type,
-//       quantity: donation.quantity,
-//       expiry_date: donation.expiry_date,
-//       // pickup_time: donation.pickup_time,
-//       // delivery_time: donation.delivery_time,
-//       // delivery_status: donation.delivery_status,
-//     });
+// .............................available donations...............................................
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+}
 
-//     await recipient.save();
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
 
-//     res.json({ message: 'Rider assigned successfully', donation });
-//   } catch (error) {
-//     console.error('Error assigning rider:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// });
+app.get('/donations/nearby/:recipientId', async (req, res) => {
+  try {
+    const { recipientId } = req.params;
 
+    // Find the recipient by ID
+    const recipient = await Recipient.findById(recipientId);
+    if (!recipient) {
+      return res.status(404).json({ message: 'Recipient not found' });
+    }
+
+    // Get the recipient's coordinates
+    const [recipientLongitude, recipientLatitude] = recipient.location.coordinates;
+
+    // Find all donors in the donations collection
+    const donors = await Donor.find();
+
+    // Calculate the distance of each donor from the recipient's coordinates
+    const nearbyDonors = await Promise.all(
+      donors.map(async (donor) => {
+        const [donorLongitude, donorLatitude] = donor.location.coordinates;
+        const distance = calculateDistance(
+          recipientLatitude,
+          recipientLongitude,
+          donorLatitude,
+          donorLongitude
+        );
+        return { donorId: donor._id, location: [donorLongitude, donorLatitude], distance };
+      })
+    );
+
+    // Filter out donors that are within 50km range
+    const filteredNearbyDonors = nearbyDonors.filter((donor) => donor.distance <= 50);
+
+    res.json({ nearbyDonors: filteredNearbyDonors });
+  } catch (error) {
+    console.error('Error fetching and calculating donor distances:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 app.get("/", (req, res) => {
   // console.log("Recipient routes Working");
   res.send("Recipient routes Working");
 });
-
+// 
 app.post("/recipients", async (req, res) => {
   try {
     const recipientData = req.body;

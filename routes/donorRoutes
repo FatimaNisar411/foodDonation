@@ -420,11 +420,11 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
   }
 });
 // Route to get donations of a donor with status pending or pickup
-app.get('/donor/:donorId/donations', async (req, res) => {
+app.get('/donor/:donorId/donations', validateTokenMiddleware , async (req, res) => {
   try {
     const { donorId } = req.params;
 
-    const donations = await Donation.find({ donor: donorId, status: { $in: ['pending', 'picked up'] } });
+    const donations = await Donation.find({ donor: donorId, status: { $in: ['pending', 'picked_up'] } });
 
     if (!donations.length) {
       return res.status(404).json({ message: 'No donations found with the specified status' });
@@ -438,7 +438,7 @@ app.get('/donor/:donorId/donations', async (req, res) => {
 });
 
 // Route to get donations of a donor with status completed (history)
-app.get('/donor/:donorId/donations/delivered', async (req, res) => {
+app.get('/donor/:donorId/donations/delivered',validateTokenMiddleware , async (req, res) => {
   try {
     const { donorId } = req.params;
 
