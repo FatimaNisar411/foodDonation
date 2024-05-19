@@ -137,8 +137,7 @@ app.get(
 );
 
 // ============= AUTH ROUTES - END ==========/
-
-app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , async (req, res) => {
+app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware, async (req, res) => {
   try {
     const { recipientId, donationId } = req.params;
     const { riderId } = req.body;
@@ -162,7 +161,8 @@ app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , asy
     }
 
     // Update the donation's assigned_rider field
-    donation.assigned_rider = riderId;
+    donation.rider = riderId;
+    donation.recipient = recipientId; // Update the recipient field
     await donation.save();
 
     // Add the donation to the recipient's received_donations array
@@ -172,9 +172,6 @@ app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , asy
       food_type: donation.food_type,
       quantity: donation.quantity,
       expiry_date: donation.expiry_date,
-      // pickup_time: donation.pickup_time,
-      // delivery_time: donation.delivery_time,
-      // delivery_status: donation.delivery_status,
     });
     await recipient.save();
 
@@ -187,14 +184,19 @@ app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , asy
     });
     await rider.save();
 
-    // const donorDonationIndex = donor.donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
-    // if (donorDonationIndex !== -1) {
-    //   donor.donations[donorDonationIndex].recipient = recipientId; // Update the recipient ID in the donor's donation
-    // } else {
-    //   console.log(`Donation with ID ${donation._id} not found in donor's donations array`);
-    //   return res.status(404).json({ message: 'Donation not found in donor\'s donations array' });
-    // }
-    // await donor.save();
+    // Update the recipient ID in the donor's donation array
+    const donor = await Donor.findById(donation.donor);
+    if (!donor) {
+      return res.status(404).json({ message: 'Donor not found' });
+    }
+
+    const donorDonationIndex = donor.donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+    if (donorDonationIndex !== -1) {
+      donor.donations[donorDonationIndex].recipient = recipientId;
+      await donor.save();
+    } else {
+      console.log(`Donation with ID ${donation._id} not found in donor's donations array`);
+    }
 
     res.json({ message: 'Rider assigned successfully', donation });
   } catch (error) {
@@ -202,6 +204,87 @@ app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , asy
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+app.get('/donations/:id/rider', async (req, res) => {
+  try {
+    const donation = await Donation.findById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ message: 'Donation not found' });
+    }
+    res.json({ rider: donation.rider });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// app.post('/assign-rider/:recipientId/:donationId', validateTokenMiddleware , async (req, res) => {
+//   try {
+//     const { recipientId, donationId } = req.params;
+//     const { riderId } = req.body;
+
+//     // Find the recipient
+//     const recipient = await Recipient.findById(recipientId);
+//     if (!recipient) {
+//       return res.status(404).json({ message: 'Recipient not found' });
+//     }
+
+//     // Find the donation
+//     const donation = await Donation.findById(donationId);
+//     if (!donation) {
+//       return res.status(404).json({ message: 'Donation not found' });
+//     }
+
+//     // Find the rider
+//     const rider = await Rider.findById(riderId);
+//     if (!rider) {
+//       return res.status(404).json({ message: 'Rider not found' });
+//     }
+
+//     // Update the donation's assigned_rider field
+//     donation.assigned_rider = riderId;
+//     await donation.save();
+
+//     // Add the donation to the recipient's received_donations array
+//     recipient.received_donations.push({
+//       donation_id: donation._id,
+//       donor_id: donation.donor,
+//       food_type: donation.food_type,
+//       quantity: donation.quantity,
+//       expiry_date: donation.expiry_date,
+//       // pickup_time: donation.pickup_time,
+//       // delivery_time: donation.delivery_time,
+//       // delivery_status: donation.delivery_status,
+//     });
+//     await recipient.save();
+
+//     // Add the donation to the rider's delivered_donations array
+//     rider.delivered_donations.push({
+//       donation_id: donation._id,
+//       delivery_status: 'pending', // initial status
+//       pickup_time: null,          // set to null initially
+//       delivery_time: null,        // set to null initially
+//     });
+//     await rider.save();
+//     // Update the recipient ID in the donor's donation array
+
+// if (donation.donor && Array.isArray(donation.donor.donations)) {
+//   const donorDonationIndex = donation.donor.donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+//   if (donorDonationIndex !== -1) {
+//     donation.donor.donations[donorDonationIndex].recipient = recipientId;
+//     await donation.donor.save();
+//   } else {
+//     console.log(`Donation with ID ${donation._id} not found in donor's donations array`);
+//   }
+// } else {
+//   console.log(`Donor or donor's donations array not found for donation with ID ${donation._id}`);
+// }
+
+//     res.json({ message: 'Rider assigned successfully', donation });
+//   } catch (error) {
+//     console.error('Error assigning rider:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
 app.get('/riders/:recipientId', validateTokenMiddleware, async (req, res) => {
   try {
     const { recipientId } = req.params;
@@ -268,7 +351,27 @@ app.get('/donations/nearby/:recipientId', async (req, res) => {
           donorLatitude,
           donorLongitude
         );
-        return { donorId: donor._id, location: [donorLongitude, donorLatitude], distance };
+
+        // Include more data along with the distance
+        const nearbyDonor = {
+          donorId: donor._id,
+          location: [donorLongitude, donorLatitude],
+          distance,
+          username: donor.username,
+          type: donor.type,
+          restaurant_name: donor.restaurant_name,
+          contact: donor.contact,
+          address: donor.address,
+          email: donor.email,
+          // Include other fields as needed
+        };
+
+        // Include data from the donations array for all donations
+        if (donor.donations && donor.donations.length > 0) {
+          nearbyDonor.donationData = donor.donations;
+        }
+
+        return nearbyDonor;
       })
     );
 
@@ -280,6 +383,11 @@ app.get('/donations/nearby/:recipientId', async (req, res) => {
     console.error('Error fetching and calculating donor distances:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+app.get("/", (req, res) => {
+  // console.log("Recipient routes Working");
+  res.send("Recipient routes Working");
 });
 app.get("/", (req, res) => {
   // console.log("Recipient routes Working");

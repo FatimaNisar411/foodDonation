@@ -9,6 +9,7 @@ const Donor= require('../models/donor');
 const Recipient= require('../models/Recipient');
 const { sendEmail } = require('../utils/emailUtils');
 const nodemailer = require('nodemailer');
+const { validate } = require('../models/Admin');
 
 const app = express();
 
@@ -24,7 +25,7 @@ const blacklistedTokens = new Set();
 
 // ======================= MIDDLEWARES ===============================
 const validateTokenMiddleware = (req, res, next) => {
-  const token = req.headers.authorization;
+  const token = req.headers.authorization.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: "Authorization header is missing" });
@@ -89,7 +90,7 @@ const sendEmailllll = async (email,subject,message) => {
 };
 
 
-app.post('/signup-rider/:recipientId', async (req, res) => {
+app.post('/signup-rider/:recipientId', validateTokenMiddleware, async (req, res) => {
   const recipientId = req.params.recipientId;
   const { username, contact, email, number_plate, starting_time, ending_time } = req.body;
   try {
@@ -132,26 +133,61 @@ app.post('/signup-rider/:recipientId', async (req, res) => {
   }
 });
 // ============= AUTH ROUTES - END ==========/
-
 app.post('/login-rider', async (req, res) => {
   const { username, password } = req.body;
 
   try {
     // Check if the rider exists in MongoDB
+    console.log(`Looking for rider with username: ${username}`);
     const rider = await Rider.findOne({ username });
 
-    if (rider && (await bcrypt.compare(password, rider.password))) {
-      // Password is correct, generate a JWT token
-      const token = jwt.sign({ userId: rider._id }, secretKey, { expiresIn: '1h' });
-      res.json({ token });
-    } else {
-      res.status(401).json({ message: 'Invalid credentials' });
+    if (!rider) {
+      console.log('Rider not found');
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    console.log('Rider found:', rider);
+    console.log('Provided password:', password);
+    console.log('Stored hashed password:', rider.password);
+
+    // Compare the provided password with the hashed password
+    const isMatch = await bcrypt.compare(password, rider.password);
+    if (!isMatch) {
+      console.log('Password does not match');
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    console.log('Password matches');
+
+    // Password is correct, generate a JWT token
+    const token = jwt.sign({ userId: rider._id }, secretKey, { expiresIn: '1h' });
+    res.json({ token });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+
+// app.post('/login-rider', async (req, res) => {
+//   const { username, password } = req.body;
+
+//   try {
+//     // Check if the rider exists in MongoDB
+//     const rider = await Rider.findOne({ username });
+
+//     if (rider && (await bcrypt.compare(password, rider.password))) {
+//       // Password is correct, generate a JWT token
+//       const token = jwt.sign({ userId: rider._id }, secretKey, { expiresIn: '1h' });
+//       res.json({ token });
+//     } else {
+//       res.status(401).json({ message: 'Invalid credentials' });
+//     }
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
 
 app.post('/logout-rider', validateTokenMiddleware, (req, res) => {
   const token = req.headers.authorization;
@@ -193,6 +229,100 @@ app.get('/assigned-donations/:riderId', async (req, res) => {
   }
 });
 //-------------------Update Status----------------------------------
+// app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (req, res) => {
+//   const { status } = req.params;
+//   const { riderId } = req.params;
+
+//   try {
+//     // Find the rider in the database
+//     const rider = await Rider.findById(riderId);
+//     if (!rider) {
+//       console.log(`Rider with ID ${riderId} not found`);
+//       return res.status(404).json({ message: 'Rider not found' });
+//     }
+
+//     // Check if the rider has any delivered donations
+//     if (rider.delivered_donations && rider.delivered_donations.length > 0) {
+//       // Get the last delivered donation
+//       const lastDeliveredDonation = rider.delivered_donations[rider.delivered_donations.length - 1];
+
+//       // Update the status of the last delivered donation in the donation collection
+//       const donation = await Donation.findById(lastDeliveredDonation.donation_id);
+//       if (!donation) {
+//         console.log(`Donation with ID ${lastDeliveredDonation.donation_id} not found`);
+//         return res.status(404).json({ message: 'Donation not found' });
+//       }
+
+//       // Update the status based on the input status
+//       if (status === 'pending') {
+//         donation.status = 'pending';
+//       } else if (status === 'in_progress') {
+//         donation.status = 'picked_up';
+//         donation.recipient_donation_status = 'in_progress';
+//       } else if (status === 'delivered') {
+//         donation.status = 'delivered';
+//         donation.recipient_donation_status = 'delivered';
+//       }
+//       await donation.save();
+//       console.log(`Updated donation status to: ${donation.status}`);
+
+//       // Update the donation in the donor's array of donations
+//       const donor = await Donor.findById(donation.donor);
+//       if (!donor) {
+//         console.log(`Donor with ID ${donation.donor} not found`);
+//         return res.status(404).json({ message: 'Donor not found' });
+//       }
+
+//       const donorDonationIndex = donor.donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+//       if (donorDonationIndex !== -1) {
+//         donor.donations[donorDonationIndex].status = donation.status;
+//         await donor.save();
+//         console.log(`Updated donor's donation status`);
+//       } else {
+//         console.log(`Donation with ID ${donation._id} not found in donor's donations array`);
+//         console.log('Donor donations:', donor.donations);
+//       }
+
+//       // Check if the recipient field is defined in the donation
+//       if (donation.recipient) {
+//         // Update the donation in the recipient's array of received donations
+//         const recipient = await Recipient.findById(donation.recipient);
+//         if (!recipient) {
+//           console.log(`Recipient with ID ${donation.recipient} not found`);
+//           return res.status(404).json({ message: 'Recipient not found' });
+//         }
+
+//         const recipientDonationIndex = recipient.received_donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+//         if (recipientDonationIndex !== -1) {
+//           recipient.received_donations[recipientDonationIndex].status = donation.status;
+//           recipient.received_donations[recipientDonationIndex].recipient_donation_status = donation.recipient_donation_status;
+//           await recipient.save();
+//           console.log(`Updated recipient's received donation status`);
+//         } else {
+//           console.log(`Donation with ID ${donation._id} not found in recipient's received donations array`);
+//           console.log('Recipient donations:', recipient.received_donations);
+//         }
+//       } else {
+//         console.log(`Donation recipient is undefined`);
+//       }
+
+//       // Update the rider's last delivered donation status
+//       lastDeliveredDonation.delivery_status = donation.status === 'picked_up' ? 'in_progress' : donation.status;
+//       await rider.save();
+//       console.log(`Rider updated successfully`);
+
+//       // Return a success message or the updated rider object
+//       return res.status(200).json({ message: 'Status updated successfully', rider });
+//     } else {
+//       console.log('Rider has no delivered donations');
+//       return res.status(400).json({ message: 'Rider has no delivered donations' });
+//     }
+//   } catch (err) {
+//     console.error('Error:', err.message);
+//     return res.status(500).json({ message: 'Internal Server Error' });
+//   }
+// });
+
 app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (req, res) => {
   const { status } = req.params;
   const { riderId } = req.params;
@@ -220,6 +350,7 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
       // Update the status based on the input status
       if (status === 'pending') {
         donation.status = 'pending';
+        donation.recipient_donation_status = 'pending';
       } else if (status === 'in_progress') {
         donation.status = 'picked_up';
         donation.recipient_donation_status = 'in_progress';
@@ -247,9 +378,8 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
         console.log('Donor donations:', donor.donations);
       }
 
-      // Check if the recipient field is defined in the donation
+      // Update the recipient's received donation
       if (donation.recipient) {
-        // Update the donation in the recipient's array of received donations
         const recipient = await Recipient.findById(donation.recipient);
         if (!recipient) {
           console.log(`Recipient with ID ${donation.recipient} not found`);
@@ -258,7 +388,7 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
 
         const recipientDonationIndex = recipient.received_donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
         if (recipientDonationIndex !== -1) {
-          recipient.received_donations[recipientDonationIndex].status = donation.status;
+          recipient.received_donations[recipientDonationIndex].delivery_status = donation.status;
           recipient.received_donations[recipientDonationIndex].recipient_donation_status = donation.recipient_donation_status;
           await recipient.save();
           console.log(`Updated recipient's received donation status`);
@@ -271,7 +401,7 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
       }
 
       // Update the rider's last delivered donation status
-      lastDeliveredDonation.delivery_status = donation.status === 'picked_up' ? 'in_progress' : donation.status;
+      lastDeliveredDonation.delivery_status = donation.status;
       await rider.save();
       console.log(`Rider updated successfully`);
 
@@ -286,7 +416,6 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
     return res.status(500).json({ message: 'Internal Server Error' });
   }
 });
-
 
 // CRUD Routes for Riders (Optional: if needed)
 app.post("/riders", async (req, res) => {

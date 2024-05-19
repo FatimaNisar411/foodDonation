@@ -37,7 +37,12 @@ location: {
         expiry_date: { type: String, required: true }, // Changed to String
         status: { type: String, enum: ['pending', 'picked_up', 'delivered'], default: 'pending' }, // Default set to 'pending'
         pickup_time: { type: String },
-        recipient:{type:String, required:false} // Not required at creation time
+        recipient: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Recipient',
+          default: null,  // Default value set to null
+          required: false  // Not required
+        }
       },
     ],
     default: [],

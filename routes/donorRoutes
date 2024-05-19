@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const Donor = require("../models/donor");
 const cors = require('cors');
 const Donation= require('../models/Donations');
+const Rider = require('../models/Rider');
 
 
 const app = express();
@@ -226,104 +227,6 @@ app.post('/login-donor', async (req, res) => {
   });
   
   
-  // app.post('/add-donation-to-donor', async (req, res) => {
-  //   try {
-  //     const userId = '6648553d17337efdebf72d96'; // Replace with a valid user ID
-  //     const donor = await Donor.findById(userId);
-  
-  //     if (!donor) {
-  //       return res.status(404).json({ message: 'Donor not found' });
-  //     }
-  
-  //     console.log('Donor found:', donor);
-  
-  //     const { food_type, quantity, expiry_date, pickup_time } = req.body;
-  
-  //     // Generate a unique donation ID
-  //     const donationId = '000000000000111111112222';
-  
-  //     // Create a new donation object with the required fields
-  //     const newDonation = {
-  //       food_type,
-  //       quantity,
-  //       expiry_date,
-  //       pickup_time,
-  //       donation_id: donationId
-  //     };
-  
-  //     console.log('New donation object:', newDonation);
-  
-  //     // Push the new donation object to the donor's donations array
-  //     donor.donations.push(newDonation);
-  
-  //     // Save the updated donor object
-  //     await donor.save();
-  
-  //     const updatedDonor = await Donor.findById(userId);
-  
-  //     console.log('Updated Donor:', updatedDonor);
-  //     console.log('Donations:', updatedDonor.donations);
-  
-  //     res.json({ message: 'Donation added successfully' });
-  //   } catch (error) {
-  //     console.error('Error adding donation:', error);
-  //     res.status(500).json({ message: 'Internal server error' });
-  //   }
-  // });
-
-
-// app.post('/add-donation', async (req, res) => {
-//   try {
-//     const userId = '66464769f8e9bc05709878f7'; // Replace with a valid user ID
-//     const donor = await Donor.findById(userId);
-
-//     if (!donor) {
-//       return res.status(404).json({ message: 'Donor not found' });
-//     }
-
-//     console.log('Donor found:', donor);
-
-//     const { food_type, quantity, expiry_date, pickup_time } = req.body;
-
-//     // Generate a unique donation ID
-//     const donationId = '000000000000111111112222';
-
-//     // Create a new donation object
-//     const newDonation = {
-//       donor: userId, // Set the donor field to the user ID
-//       food_type,
-//       quantity,
-//       expiry_date,
-//       pickup_time,
-//       donation_id: donationId
-//     };
-
-//     console.log('New donation object:', newDonation);
-
-//     // Save the new donation to the donations collection
-//     const donation = new Donation(newDonation);
-//     console.log('Saving donation:', donation);
-
-//     await donation.save();
-//     console.log('Donation saved successfully:', donation);
-
-//     // Update the donor's donations array with the new donation object
-//     donor.donations.push(donation);
-
-//     // Save the updated donor object
-//     await donor.save();
-
-//     const updatedDonor = await Donor.findById(userId);
-
-//     console.log('Updated Donor:', updatedDonor);
-//     console.log('Donations:', updatedDonor.donations);
-
-//     res.json({ message: 'Donation added successfully' });
-//   } catch (error) {
-//     console.error('Error adding donation:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// });
 app.post('/add-donation-to-Donations', async (req, res) => {
   try {
     const userId = '6648553d17337efdebf72d96'; // Replace with a valid user ID
@@ -375,7 +278,7 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
 
     console.log('Donor found:', donor);
 
-    const { food_type, quantity, expiry_date, status ,pickup_time } = req.body;
+    const { food_type, quantity, expiry_date, status ,pickup_time,recipient } = req.body;
 
     // Create a new donation object
     const newDonation = new Donation({
@@ -400,6 +303,7 @@ app.post('/add-donation/:donorId', validateTokenMiddleware , async (req, res) =>
       expiry_date,
       status,
       pickup_time,
+      recipient,
       donation_id: newDonation._id // Add the donation ID from the newly created donation
     };
 
@@ -452,6 +356,43 @@ app.get('/donor/:donorId/donations/delivered',validateTokenMiddleware , async (r
   } catch (error) {
     console.error('Error fetching completed donations:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+// Endpoint for donor to get rider details
+app.get('/donors/:donorId/donations/:donationId/rider', async (req, res) => {
+  try {
+    const { donorId, donationId } = req.params;
+    console.log('Request received:', req.method, req.url);
+    console.log('donorId:', donorId);
+    console.log('donationId:', donationId);
+
+    // Find the donation
+    const donation = await Donation.findById(donationId);
+    if (!donation) {
+      console.log('Donation not found');
+      return res.status(404).json({ message: 'Donation not found' });
+    }
+
+    // Find the rider
+    const rider = await Rider.findById(donation.rider);
+    if (!rider) {
+      console.log('Rider not found');
+      return res.status(404).json({ message: 'Rider not found' });
+    }
+
+    // Return the rider details
+    console.log('Returning rider details:', rider);
+    res.json({
+      riderName: rider.username,
+      riderContact: rider.contact,
+      riderEmail: rider.email,
+      riderVehicle: rider.number_plate,
+      riderStartTime: rider.starting_time,
+      riderEndTime: rider.ending_time
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 

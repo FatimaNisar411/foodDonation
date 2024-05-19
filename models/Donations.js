@@ -34,7 +34,18 @@ const DonationsSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'picked_up', 'delivered'], required: true, default: 'pending' },
   pickup_time: { type: String },  // Changed to String
   delivery_time: { type: String },
-  recipient:{type:String, required:false} // Changed to String
+  recipient: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Recipient',
+    default: null,  // Default value set to null
+    required: false  // Not required
+  }, // Changed to String
+  rider: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Rider',
+    default: null,  // Default value set to null
+    required: false  // Not required
+  } 
 });
 
 const Donations = mongoose.model('Donations', DonationsSchema);
