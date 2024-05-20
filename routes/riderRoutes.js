@@ -10,6 +10,7 @@ const Recipient= require('../models/Recipient');
 const { sendEmail } = require('../utils/emailUtils');
 const nodemailer = require('nodemailer');
 const { validate } = require('../models/Admin');
+const mongoose = require('mongoose');
 
 const app = express();
 
@@ -64,21 +65,39 @@ function generateRandomPassword(length) {
 
 // ============= AUTH ROUTES START ==========/
 
-
-const sendEmailllll = async (email,subject,message) => {
+const sendEmailllll = async (email, username, password) => {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: 'syedabdulrab1133@gmail.com', 
-      pass: "fdvvmbxqxyfftxit",  
+      user: 'syedabdulrab1133@gmail.com', // Your email address
+      pass: 'fdvvmbxqxyfftxit',    // Your email app password
     },
   });
 
   const mailOptions = {
-    from: 'syedabdulrab1133@gmail.com', 
-    to: email,
-    subject: subject,
-    text: message,
+    from: 'syedabdulrab1133@gmail.com', // Sender address
+    to: email,                          // Recipient's email address
+    subject: ' ✨ Welcome to Satiate  ✨',
+    html: `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+      <div style="background-color: #4CAF50; color: white; padding: 10px 20px; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0; font-size: 24px;">Welcome to Satiate</h1>
+      </div>
+      <div style="padding: 20px; background-color: white; border-radius: 0 0 10px 10px;">
+        <p style="font-size: 18px; color: #333;">Hello <strong>${username}</strong>!</p>
+        <p style="font-size: 16px; color: #555;">We are thrilled to have you on board. Here are your credentials:</p>
+        <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin: 20px 0;">
+          <p style="font-size: 16px; color: #333;">Username: <strong>${username}</strong></p>
+          <p style="font-size: 16px; color: #333;">Password: <strong>${password}</strong></p>
+        </div>
+        <p style="font-size: 16px; color: #555;">Please keep this information safe and do not share it with anyone.</p>
+        <p style="font-size: 16px; color: #555;">If you have any questions or need assistance, feel free to <a href="mailto:support@satiate.com" style="color: #4CAF50; text-decoration: none;">contact us</a>.</p>
+        <p style="font-size: 16px; color: #555;">Thank you for joining Satiate! We're excited to have you with us.</p>
+        <p style="font-size: 16px; color: #333;">Best Regards,</p>
+        <p style="font-size: 16px; color: #333;"><strong>The Satiate Team</strong></p>
+      </div>
+    </div>
+    `, 
   };
 
   try {
@@ -88,6 +107,29 @@ const sendEmailllll = async (email,subject,message) => {
     console.error('Error sending email: ', error);
   }
 };
+// const sendEmailllll = async (email,subject,message) => {
+//   const transporter = nodemailer.createTransport({
+//     service: 'gmail',
+//     auth: {
+//       user: 'syedabdulrab1133@gmail.com', 
+//       pass: "fdvvmbxqxyfftxit",  
+//     },
+//   });
+
+//   const mailOptions = {
+//     from: 'syedabdulrab1133@gmail.com', 
+//     to: email,
+//     subject: subject,
+//     text: message,
+//   };
+
+//   try {
+//     const info = await transporter.sendMail(mailOptions);
+//     console.log('Email sent: ', info.response);
+//   } catch (error) {
+//     console.error('Error sending email: ', error);
+//   }
+// };
 
 
 app.post('/signup-rider/:recipientId', validateTokenMiddleware, async (req, res) => {
@@ -121,7 +163,7 @@ app.post('/signup-rider/:recipientId', validateTokenMiddleware, async (req, res)
     });
 
     await newRider.save();
-    sendEmailllll(email, `Welcome Fatima Riders, ${username}!`, `Your password is: ${password}, please keep it safe. Happy Riding!`);
+    sendEmailllll(email, username, password);
 
     const token = jwt.sign({ userId: newRider._id }, secretKey, { expiresIn: '1h' });
 
@@ -138,7 +180,7 @@ app.post('/login-rider', async (req, res) => {
 
   try {
     // Check if the rider exists in MongoDB
-    console.log(`Looking for rider with username: ${username}`);
+    
     const rider = await Rider.findOne({ username });
 
     if (!rider) {
@@ -167,6 +209,83 @@ app.post('/login-rider', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+// app.post('/signup-rider/:recipientId', validateTokenMiddleware, async (req, res) => {
+//   const recipientId = req.params.recipientId;
+//   const { username, contact, email, number_plate, starting_time, ending_time } = req.body;
+//   try {
+//     // Check if the email is already registered
+//     Rider.findByIdAndUpdate
+//     const existingRider = await Rider.findOne({ email });
+//     if (existingRider) {
+//       return res.status(400).json({ message: 'Email is already registered' });
+//     }
+
+//     // Generate a random 8-character password
+//     const password = generateRandomPassword(8);
+
+//     // Hash the password using bcrypt
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Create a new Rider with the provided data
+//     const newRider = new Rider({
+//       username,
+//       contact,
+//       email,
+//       password: hashedPassword,
+//       recipient: recipientId, // Assign the recipient's object ID from the URL
+//       delivered_donations: [],
+//       number_plate,
+//       starting_time,
+//       ending_time
+//     });
+
+//     await newRider.save();
+//     sendEmailllll(email, `Welcome , ${username}!`, `Your password is: ${password}, please keep it safe.`);
+
+//     const token = jwt.sign({ userId: newRider._id }, secretKey, { expiresIn: '1h' });
+
+//     // Optionally, send the plain password to the rider via email or response
+//     res.json({ token, password }); // Sending the plain password in the response (not recommended for production)
+//   } catch (error) {
+//     console.error('Error:', error)
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
+// // ============= AUTH ROUTES - END ==========/
+// app.post('/login-rider', async (req, res) => {
+//   const { username, password } = req.body;
+
+//   try {
+//     // Check if the rider exists in MongoDB
+//     console.log(`Looking for rider with username: ${username}`);
+//     const rider = await Rider.findOne({ username });
+
+//     if (!rider) {
+//       console.log('Rider not found');
+//       return res.status(401).json({ message: 'Invalid credentials' });
+//     }
+
+//     console.log('Rider found:', rider);
+//     console.log('Provided password:', password);
+//     console.log('Stored hashed password:', rider.password);
+
+//     // Compare the provided password with the hashed password
+//     const isMatch = await bcrypt.compare(password, rider.password);
+//     if (!isMatch) {
+//       console.log('Password does not match');
+//       return res.status(401).json({ message: 'Invalid credentials' });
+//     }
+
+//     console.log('Password matches');
+
+//     // Password is correct, generate a JWT token
+//     const token = jwt.sign({ userId: rider._id }, secretKey, { expiresIn: '1h' });
+//     res.json({ token });
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
 
 
 // app.post('/login-rider', async (req, res) => {
@@ -322,8 +441,82 @@ app.get('/assigned-donations/:riderId', async (req, res) => {
 //     return res.status(500).json({ message: 'Internal Server Error' });
 //   }
 // });
+// New endpoint to fetch recipient location
+app.get('/riders/:riderId/recipient/location', async (req, res) => {
+  try {
+    const { riderId } = req.params;
 
-app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (req, res) => {
+    // Find the rider
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      console.log('Rider not found');
+      return res.status(404).json({ message: 'Rider not found' });
+    }
+
+    // Find the recipient
+    const recipient = await Recipient.findById(rider.recipient);
+    if (!recipient) {
+      console.log('Recipient not found');
+      return res.status(404).json({ message: 'Recipient not found' });
+    }
+
+    console.log('Retrieved recipient:', recipient);
+
+    // Return the recipient's location
+    console.log('Returning recipient location:', recipient.location.coordinates);
+    res.json({ coordinates: recipient.location.coordinates });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+//-----------donor coordinates for the recipient----------------
+app.get('/riders/:riderId/donor/location', async (req, res) => {
+  try {
+    const { riderId } = req.params;
+
+    // Find the rider
+    const rider = await Rider.findById(riderId);
+    if (!rider) {
+      return res.status(404).json({ message: 'Rider not found' });
+    }
+
+    // Check if the rider has any delivered donations
+    if (rider.delivered_donations.length > 0) {
+      // Get the last added delivered donation
+      const lastDeliveredDonation = rider.delivered_donations[rider.delivered_donations.length - 1];
+
+      // Ensure that lastDeliveredDonation.donation_id is a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(lastDeliveredDonation.donation_id)) {
+        return res.status(400).json({ message: 'Invalid donation ID' });
+      }
+
+      // Find the corresponding donation
+      const donation = await Donation.findById(lastDeliveredDonation.donation_id);
+      if (!donation) {
+        return res.status(404).json({ message: 'Donation not found' });
+      }
+
+      // Find the donor using the donation's donor reference
+      const donor = await Donor.findById(donation.donor);
+      if (!donor) {
+        return res.status(404).json({ message: 'Donor not found for the last delivered donation' });
+      }
+
+      // Return the donor's location
+      res.json({ coordinates: donor.location.coordinates });
+    } else {
+      return res.status(404).json({ message: 'Rider has no delivered donations' });
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+
+
+app.put('/rider/update-last-delivered-donation-status/:riderId/:status', validateTokenMiddleware, async (req, res) => {
   const { status } = req.params;
   const { riderId } = req.params;
 
@@ -358,10 +551,37 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
         donation.status = 'delivered';
         donation.recipient_donation_status = 'delivered';
       }
-      await donation.save();
-      console.log(`Updated donation status to: ${donation.status}`);
 
-      // Update the donation in the donor's array of donations
+      // Update the recipient's received donation
+      if (donation.recipient) {
+        const recipient = await Recipient.findById(donation.recipient);
+        if (!recipient) {
+          console.log(`Recipient with ID ${donation.recipient} not found`);
+          return res.status(404).json({ message: 'Recipient not found' });
+        }
+
+        const recipientDonationIndex = recipient.received_donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
+        if (recipientDonationIndex !== -1) {
+          // Update the recipient's received donation status
+          if (status === 'in_progress') {
+            recipient.received_donations[recipientDonationIndex].delivery_status = 'in_progress';
+          } else {
+            recipient.received_donations[recipientDonationIndex].delivery_status = status;
+          }
+          recipient.received_donations[recipientDonationIndex].recipient_donation_status = donation.recipient_donation_status;
+          await recipient.save();
+          console.log(`Updated recipient's received donation status`);
+        } else {
+          console.log(`Donation with ID ${donation._id} not found in recipient's received donations array`);
+          console.log('Recipient donations:', recipient.received_donations);
+        }
+      } else {
+        console.log(`Donation recipient is undefined`);
+      }
+
+      await donation.save();
+
+      // Update the donor's donation status
       const donor = await Donor.findById(donation.donor);
       if (!donor) {
         console.log(`Donor with ID ${donation.donor} not found`);
@@ -378,30 +598,8 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
         console.log('Donor donations:', donor.donations);
       }
 
-      // Update the recipient's received donation
-      if (donation.recipient) {
-        const recipient = await Recipient.findById(donation.recipient);
-        if (!recipient) {
-          console.log(`Recipient with ID ${donation.recipient} not found`);
-          return res.status(404).json({ message: 'Recipient not found' });
-        }
-
-        const recipientDonationIndex = recipient.received_donations.findIndex(d => d.donation_id.toString() === donation._id.toString());
-        if (recipientDonationIndex !== -1) {
-          recipient.received_donations[recipientDonationIndex].delivery_status = donation.status;
-          recipient.received_donations[recipientDonationIndex].recipient_donation_status = donation.recipient_donation_status;
-          await recipient.save();
-          console.log(`Updated recipient's received donation status`);
-        } else {
-          console.log(`Donation with ID ${donation._id} not found in recipient's received donations array`);
-          console.log('Recipient donations:', recipient.received_donations);
-        }
-      } else {
-        console.log(`Donation recipient is undefined`);
-      }
-
       // Update the rider's last delivered donation status
-      lastDeliveredDonation.delivery_status = donation.status;
+      lastDeliveredDonation.delivery_status = status;
       await rider.save();
       console.log(`Rider updated successfully`);
 
@@ -416,7 +614,6 @@ app.put('/rider/update-last-delivered-donation-status/:riderId/:status', async (
     return res.status(500).json({ message: 'Internal Server Error' });
   }
 });
-
 // CRUD Routes for Riders (Optional: if needed)
 app.post("/riders", async (req, res) => {
   try {
@@ -432,8 +629,8 @@ app.post("/riders", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-app.get("/riders/:id", async (req, res) => {
+// ----------------get rider info-------------------
+app.get("/riders/:id", validateTokenMiddleware,async (req, res) => {
   try {
     const id = req.params.id;
     const rider = await Rider.findById(id);

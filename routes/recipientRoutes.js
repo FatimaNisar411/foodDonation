@@ -408,11 +408,13 @@ app.post("/recipients", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-app.get("/recipients/:id", async (req, res) => {
+// ----------------get recipient info and all their donations----------------
+app.get("/recipients/:id", validateTokenMiddleware, async (req, res) => {
   try {
     const id = req.params.id;
-    const recipient = await recipientService.getRecipientByID(id);
+    
+    const recipient = await Recipient.findById(id);
+    // const recipient = await recipientService.getRecipientByID(id);
     res.status(200).json(recipient);
   } catch (error) {
     console.error("Error fetching recipients:", error);

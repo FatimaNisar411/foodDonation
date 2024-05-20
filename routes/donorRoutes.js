@@ -377,7 +377,7 @@ app.get('/donors/:donorId/donations/:donationId/rider', async (req, res) => {
     const rider = await Rider.findById(donation.rider);
     if (!rider) {
       console.log('Rider not found');
-      return res.status(404).json({ message: 'Rider not found' });
+      return res.status(200).json({});
     }
 
     // Return the rider details
@@ -418,8 +418,8 @@ app.listen(PORT, () => {
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
-  
-  app.get("/donors/:id", async (req, res) => {
+  //-----------------get donor info-------------------
+  app.get("/donors/:id", validateTokenMiddleware,  async (req, res) => {
     try {
       const id = req.params.id;
       const donor = await Donor.findById(id);
