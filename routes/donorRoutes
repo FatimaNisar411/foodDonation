@@ -22,8 +22,20 @@ const blacklistedTokens = new Set();
 
 // ======================= MIDDLEWARES ===============================
 const validateTokenMiddleware = (req, res, next) => {
-  const token = req.headers.authorization.split(' ')[1]; // Extract token from 'Bearer <token>'
+  const authHeader = req.headers.authorization;
 
+  if (!authHeader) {
+    return res.status(401).json({ message: "Authorization header is missing" });
+  }
+
+  const tokenParts = authHeader.split(' ');
+  
+  if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
+    return res.status(401).json({ message: "Authorization header format is invalid" });
+  }
+
+  const token = tokenParts[1];
+  
   if (!token) {
     return res.status(401).json({ message: "Authorization header is missing" });
   }
